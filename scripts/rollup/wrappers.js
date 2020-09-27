@@ -4,6 +4,7 @@ const {bundleTypes, moduleTypes} = require('./bundles');
 const reactVersion = require('../../package.json').version;
 
 const {
+  NODE_ES2015,
   UMD_DEV,
   UMD_PROD,
   UMD_PROFILING,
@@ -29,8 +30,8 @@ const license = ` * Copyright (c) Facebook, Inc. and its affiliates.
  * LICENSE file in the root directory of this source tree.`;
 
 const wrappers = {
-  /***************** UMD_DEV *****************/
-  [UMD_DEV](source, globalName, filename, moduleType) {
+  /***************** NODE_ES2015 *****************/
+  [NODE_ES2015](source, globalName, filename, moduleType) {
     return `/** @license React v${reactVersion}
  * ${filename}
  *
@@ -42,6 +43,16 @@ ${license}
 ${source}`;
   },
 
+  /***************** UMD_DEV *****************/
+  [UMD_DEV](source, globalName, filename, moduleType) {
+    return `/** @license React v${reactVersion}
+ * ${filename}
+ *
+${license}
+ */
+${source}`;
+  },
+
   /***************** UMD_PROD *****************/
   [UMD_PROD](source, globalName, filename, moduleType) {
     return `/** @license React v${reactVersion}
@@ -49,7 +60,7 @@ ${source}`;
  *
 ${license}
  */
-${source}`;
+(function(){${source}})();`;
   },
 
   /***************** UMD_PROFILING *****************/
@@ -59,7 +70,7 @@ ${source}`;
  *
 ${license}
  */
-${source}`;
+(function(){${source}})();`;
   },
 
   /***************** NODE_DEV *****************/
@@ -71,16 +82,6 @@ ${license}
  */
 
 'use strict';
-
-${
-  globalName === 'ReactNoopRenderer' ||
-  globalName === 'ReactNoopRendererPersistent'
-    ? // React Noop needs regenerator runtime because it uses
-      // generators but GCC doesn't handle them in the output.
-      // So we use Babel for them.
-      `const regeneratorRuntime = require("regenerator-runtime");`
-    : ``
-}
 
 if (process.env.NODE_ENV !== "production") {
   (function() {
@@ -96,15 +97,6 @@ ${source}
  *
 ${license}
  */
-${
-  globalName === 'ReactNoopRenderer' ||
-  globalName === 'ReactNoopRendererPersistent'
-    ? // React Noop needs regenerator runtime because it uses
-      // generators but GCC doesn't handle them in the output.
-      // So we use Babel for them.
-      `const regeneratorRuntime = require("regenerator-runtime");`
-    : ``
-}
 ${source}`;
   },
 
@@ -115,15 +107,6 @@ ${source}`;
  *
 ${license}
  */
-${
-  globalName === 'ReactNoopRenderer' ||
-  globalName === 'ReactNoopRendererPersistent'
-    ? // React Noop needs regenerator runtime because it uses
-      // generators but GCC doesn't handle them in the output.
-      // So we use Babel for them.
-      `const regeneratorRuntime = require("regenerator-runtime");`
-    : ``
-}
 ${source}`;
   },
 
@@ -133,6 +116,7 @@ ${source}`;
 ${license}
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * @preserve-invariant-messages
  */
@@ -152,6 +136,7 @@ ${source}
 ${license}
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * @preserve-invariant-messages
  */
@@ -165,6 +150,7 @@ ${source}`;
 ${license}
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * @preserve-invariant-messages
  */
@@ -178,6 +164,7 @@ ${source}`;
 ${license}
  *
  * @noflow
+ * @nolint
  * @providesModule ${globalName}-dev
  * @preventMunge
  * ${'@gen' + 'erated'}
@@ -198,6 +185,7 @@ ${source}
 ${license}
  *
  * @noflow
+ * @nolint
  * @providesModule ${globalName}-prod
  * @preventMunge
  * ${'@gen' + 'erated'}
@@ -212,6 +200,7 @@ ${source}`;
 ${license}
  *
  * @noflow
+ * @nolint
  * @providesModule ${globalName}-profiling
  * @preventMunge
  * ${'@gen' + 'erated'}
@@ -226,6 +215,7 @@ ${source}`;
 ${license}
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * ${'@gen' + 'erated'}
  */
@@ -245,6 +235,7 @@ ${source}
 ${license}
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * ${'@gen' + 'erated'}
  */
@@ -258,6 +249,7 @@ ${source}`;
 ${license}
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * ${'@gen' + 'erated'}
  */
@@ -279,10 +271,9 @@ ${license}
 
 if (process.env.NODE_ENV !== "production") {
   module.exports = function $$$reconciler($$$hostConfig) {
+    var exports = {};
 ${source}
-    var $$$renderer = module.exports;
-    module.exports = $$$reconciler;
-    return $$$renderer;
+    return exports;
   };
 }`;
   },
@@ -295,10 +286,23 @@ ${source}
 ${license}
  */
 module.exports = function $$$reconciler($$$hostConfig) {
+    var exports = {};
 ${source}
-    var $$$renderer = module.exports;
-    module.exports = $$$reconciler;
-    return $$$renderer;
+    return exports;
+};`;
+  },
+
+  /***************** NODE_PROFILING (reconciler only) *****************/
+  [NODE_PROFILING](source, globalName, filename, moduleType) {
+    return `/** @license React v${reactVersion}
+ * ${filename}
+ *
+${license}
+ */
+module.exports = function $$$reconciler($$$hostConfig) {
+    var exports = {};
+${source}
+    return exports;
 };`;
   },
 };

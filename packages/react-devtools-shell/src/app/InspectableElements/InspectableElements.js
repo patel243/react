@@ -7,7 +7,8 @@
  * @flow
  */
 
-import React, {Fragment} from 'react';
+import * as React from 'react';
+import {Fragment} from 'react';
 import UnserializableProps from './UnserializableProps';
 import CircularReferences from './CircularReferences';
 import Contexts from './Contexts';
@@ -16,6 +17,7 @@ import CustomObject from './CustomObject';
 import EdgeCaseObjects from './EdgeCaseObjects.js';
 import NestedProps from './NestedProps';
 import SimpleValues from './SimpleValues';
+import SymbolKeys from './SymbolKeys';
 
 // TODO Add Immutable JS example
 
@@ -31,6 +33,7 @@ export default function InspectableElements() {
       <CustomObject />
       <EdgeCaseObjects />
       <CircularReferences />
+      <SymbolKeys />
     </Fragment>
   );
 }

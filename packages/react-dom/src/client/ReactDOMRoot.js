@@ -7,13 +7,10 @@
  * @flow
  */
 
-import type {DOMContainer} from './ReactDOM';
-import type {RootTag} from 'shared/ReactRootTags';
-import type {ReactNodeList} from 'shared/ReactTypes';
-// TODO: This type is shared between the reconciler and ReactDOM, but will
-// eventually be lifted out to the renderer.
-import type {FiberRoot} from 'react-reconciler/src/ReactFiberRoot';
-import {findHostInstanceWithNoPortals} from 'react-reconciler/inline.dom';
+import type {Container} from './ReactDOMHostConfig';
+import type {RootTag} from 'react-reconciler/src/ReactRootTags';
+import type {MutableSource, ReactNodeList} from 'shared/ReactTypes';
+import type {FiberRoot} from 'react-reconciler/src/ReactInternalTypes';
 
 export type RootType = {
   render(children: ReactNodeList): void,
@@ -27,6 +24,7 @@ export type RootOptions = {
   hydrationOptions?: {
     onHydrated?: (suspenseNode: Comment) => void,
     onDeleted?: (suspenseNode: Comment) => void,
+    mutableSources?: Array<MutableSource<any>>,
     ...
   },
   ...
@@ -37,6 +35,7 @@ import {
   markContainerAsRoot,
   unmarkContainerAsRoot,
 } from './ReactDOMComponentTree';
+import {listenToAllSupportedEvents} from '../events/DOMPluginEventSystem';
 import {eagerlyTrapReplayableEvents} from '../events/ReactDOMEventReplaying';
 import {
   ELEMENT_NODE,
@@ -44,17 +43,28 @@ import {
   DOCUMENT_NODE,
   DOCUMENT_FRAGMENT_NODE,
 } from '../shared/HTMLNodeType';
+import {ensureListeningTo} from './ReactDOMComponent';
 
-import {createContainer, updateContainer} from 'react-reconciler/inline.dom';
+import {
+  createContainer,
+  updateContainer,
+  findHostInstanceWithNoPortals,
+  registerMutableSourceForHydration,
+} from 'react-reconciler/src/ReactFiberReconciler';
 import invariant from 'shared/invariant';
-import {BlockingRoot, ConcurrentRoot, LegacyRoot} from 'shared/ReactRootTags';
+import {enableEagerRootListeners} from 'shared/ReactFeatureFlags';
+import {
+  BlockingRoot,
+  ConcurrentRoot,
+  LegacyRoot,
+} from 'react-reconciler/src/ReactRootTags';
 
-function ReactDOMRoot(container: DOMContainer, options: void | RootOptions) {
+function ReactDOMRoot(container: Container, options: void | RootOptions) {
   this._internalRoot = createRootImpl(container, ConcurrentRoot, options);
 }
 
 function ReactDOMBlockingRoot(
-  container: DOMContainer,
+  container: Container,
   tag: RootTag,
   options: void | RootOptions,
 ) {
@@ -108,7 +118,7 @@ ReactDOMRoot.prototype.unmount = ReactDOMBlockingRoot.prototype.unmount = functi
 };
 
 function createRootImpl(
-  container: DOMContainer,
+  container: Container,
   tag: RootTag,
   options: void | RootOptions,
 ) {
@@ -116,20 +126,50 @@ function createRootImpl(
   const hydrate = options != null && options.hydrate === true;
   const hydrationCallbacks =
     (options != null && options.hydrationOptions) || null;
+  const mutableSources =
+    (options != null &&
+      options.hydrationOptions != null &&
+      options.hydrationOptions.mutableSources) ||
+    null;
   const root = createContainer(container, tag, hydrate, hydrationCallbacks);
   markContainerAsRoot(root.current, container);
-  if (hydrate && tag !== LegacyRoot) {
-    const doc =
-      container.nodeType === DOCUMENT_NODE
-        ? container
-        : container.ownerDocument;
-    eagerlyTrapReplayableEvents(doc);
+  const containerNodeType = container.nodeType;
+
+  if (enableEagerRootListeners) {
+    const rootContainerElement =
+      container.nodeType === COMMENT_NODE ? container.parentNode : container;
+    listenToAllSupportedEvents(rootContainerElement);
+  } else {
+    if (hydrate && tag !== LegacyRoot) {
+      const doc =
+        containerNodeType === DOCUMENT_NODE
+          ? container
+          : container.ownerDocument;
+      // We need to cast this because Flow doesn't work
+      // with the hoisted containerNodeType. If we inline
+      // it, then Flow doesn't complain. We intentionally
+      // hoist it to reduce code-size.
+      eagerlyTrapReplayableEvents(container, ((doc: any): Document));
+    } else if (
+      containerNodeType !== DOCUMENT_FRAGMENT_NODE &&
+      containerNodeType !== DOCUMENT_NODE
+    ) {
+      ensureListeningTo(container, 'onMouseEnter', null);
+    }
   }
+
+  if (mutableSources) {
+    for (let i = 0; i < mutableSources.length; i++) {
+      const mutableSource = mutableSources[i];
+      registerMutableSourceForHydration(root, mutableSource);
+    }
+  }
+
   return root;
 }
 
 export function createRoot(
-  container: DOMContainer,
+  container: Container,
   options?: RootOptions,
 ): RootType {
   invariant(
@@ -141,7 +181,7 @@ export function createRoot(
 }
 
 export function createBlockingRoot(
-  container: DOMContainer,
+  container: Container,
   options?: RootOptions,
 ): RootType {
   invariant(
@@ -153,7 +193,7 @@ export function createBlockingRoot(
 }
 
 export function createLegacyRoot(
-  container: DOMContainer,
+  container: Container,
   options?: RootOptions,
 ): RootType {
   return new ReactDOMBlockingRoot(container, LegacyRoot, options);
